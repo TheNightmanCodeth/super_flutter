@@ -19,9 +19,15 @@ class SuperFlutterPlugin: MethodCallHandler {
     // Handle method calls in here
     when (call.method) {
       "get_root" -> getRootPermissions(result)
+      "run_cmd" -> runCommand(result, call.argument("cmd"))
     }
   }
 
+  /** 
+      Only requests root from superuser app to be added to whitelist 
+      This method should really never be used, since some users will
+      leave the whitelist feature of their root app of choice off.
+  */
   private fun getRootPermissions(result: Result) {
     var p: Process
     try {
@@ -38,6 +44,29 @@ class SuperFlutterPlugin: MethodCallHandler {
       }
     } catch (IOException e) {
       result.error("There was an IO Exception")
+    }
+  }
+
+  private fun runCommand(result: Result, cmd: String) {
+    var p: Process
+    try {
+      p = Runtime.getRuntime().exec("su")
+      val os: DataOutputStream = DataOutputStream(p.getOutputStream())
+      os.writeBytes("$cmd\n")
+      os.writeBytes("exit\n")
+      os.flush()
+      try {
+        p.waitFor()
+        if (p.exitValue() != 255) {
+          result.success("Process exited successfully")
+        } else {
+          result.error(p.exitValue().toString())
+        }
+      } catch (InterruptedException e) {
+        result.error(e.message)
+      }
+    } catch (IOException e) {
+      result.error(e.message)
     }
   }
 }
